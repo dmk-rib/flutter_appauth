@@ -8,6 +8,7 @@ set(PLUGIN_NAME "flutter_appauth_plugin")
 
 add_library(${PLUGIN_NAME} SHARED
   "flutter_appauth_plugin.cpp"
+  "web_browser.cpp"
 )
 apply_standard_settings(${PLUGIN_NAME})
 set_target_properties(${PLUGIN_NAME} PROPERTIES
