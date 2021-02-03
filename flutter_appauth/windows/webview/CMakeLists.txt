@@ -1,0 +1,36 @@
+cmake_minimum_required (VERSION 3.8)
+project (webview)
+
+if(APPLE)
+	set(WEBVIEW_COMPILE_DEFS "-DWEBVIEW_MAC=1")
+	find_library(COCOA_LIBRARY Cocoa)
+	find_library(WEBKIT_LIBRARY Webkit)
+	set(WEBVIEW_LIBS ${COCOA_LIBRARY} ${WEBKIT_LIBRARY})
+	set(WEBVIEW_COMPILE_OPTS "-ObjC++")
+elseif(WIN32)
+	set(WEBVIEW_COMPILE_DEFS "-DWEBVIEW_WIN=1")
+	set(WEBVIEW_LIBS "WindowsApp.lib user32.lib kernel32.lib")
+else()
+	set(WEBVIEW_COMPILE_DEFS "-DWEBVIEW_GTK=1")
+	find_package(PkgConfig REQUIRED)
+	pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
+	pkg_check_modules(WEBKIT2 REQUIRED webkit2gtk-4.0)
+	set(WEBVIEW_COMPILE_INCS ${GTK3_INCLUDE_DIRS} ${WEBKIT2_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR})
+	set(WEBVIEW_LIBS ${GTK3_LIBRARIES} ${WEBKIT2_LIBRARIES})
+endif()
+
+add_library(webview INTERFACE)
+target_include_directories(webview INTERFACE ${PROJECT_SOURCE_DIR} ${WEBVIEW_COMPILE_INCS})
+target_compile_definitions(webview INTERFACE ${WEBVIEW_COMPILE_DEFS})
+target_compile_features(webview INTERFACE cxx_std_17)
+target_compile_options(webview INTERFACE ${WEBVIEW_COMPILE_OPTS})
+target_link_libraries(webview INTERFACE ${WEBVIEW_LIBS})
+
+if(WIN32)
+	set_property(TARGET webview
+	PROPERTY VS_PACKAGE_REFERENCES "Microsoft.Web.WebView2.0.9.538"
+	)
+	set_property(TARGET webview
+	PROPERTY VS_PACKAGE_REFERENCES "Microsoft.Windows.ImplementationLibrary.1.0.200519.2"
+	)
+endif()

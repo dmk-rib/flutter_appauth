@@ -1,11 +1,9 @@
+#define WEBVIEW_EDGE
 #include "include/flutter_appauth/flutter_appauth_plugin.h"
-#include "include/flutter_appauth/web_browser.h"
 
 // This must be included before many other Windows headers.
 #include <windows.h>
-
-// For getPlatformVersion; remove unless needed for your plugin implementation.
-#include <VersionHelpers.h>
+#include <tchar.h>
 
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
@@ -15,9 +13,10 @@
 #include <memory>
 #include <sstream>
 
+#include "webview/webview.hpp"
+
 namespace
 {
-
   struct TokenRequestParameters
   {
     std::string clientId;
@@ -29,9 +28,9 @@ namespace
     std::string refreshToken;
     std::string codeVerifier;
     std::string authorizationCode;
-    // @property(nonatomic, strong) NSArray *scopes;
-    // @property(nonatomic, strong) NSDictionary *serviceConfigurationParameters;
-    // @property(nonatomic, strong) NSDictionary *additionalParameters;
+    flutter::EncodableList scopes;
+    flutter::EncodableMap serviceConfigurationParameters;
+    flutter::EncodableMap additionalParameters;
     bool preferEphemeralSession = false;
 
   public:
@@ -40,7 +39,7 @@ namespace
       const auto *arguments = std::get_if<flutter::EncodableMap>(args);
       if (arguments)
         processArguments(arguments);
-    };
+    }
 
   protected:
     virtual void processArguments(const flutter::EncodableMap *arguments)
@@ -81,20 +80,39 @@ namespace
       if (gt != arguments->end() && !gt->second.IsNull())
         grantType = std::get<std::string>(gt->second);
 
-      // _scopes = [ArgumentProcessor processArgumentValue:arguments withKey:@"scopes"];
-      // _serviceConfigurationParameters = [ArgumentProcessor processArgumentValue:arguments withKey:@"serviceConfiguration"];
-      // _additionalParameters = [ArgumentProcessor processArgumentValue:arguments withKey:@"additionalParameters"];
-      // _preferEphemeralSession = [[ArgumentProcessor processArgumentValue:arguments withKey:@"preferEphemeralSession"] isEqual:@YES];
-      // const auto pes = arguments->find(flutter::EncodableValue("preferEphemeralSession"));
-      // if (pes != arguments->end() && !pes->second.IsNull())
-      //   preferEphemeralSession = std::get<bool>(gt->second);
+      const auto sc = arguments->find(flutter::EncodableValue("scopes"));
+      if (sc != arguments->end() && !sc->second.IsNull())
+      {
+        // const auto mapp = std::get<flutter::EncodableList>(sc->second);
+        scopes = std::get<flutter::EncodableList>(sc->second);
+        // const auto *mapp = std::get_if<flutter::EncodableMap>(sc->second);
+        //scopes = std::get<std::vector<std::string>>(sc->second);
+      }
+
+      const auto scf = arguments->find(flutter::EncodableValue("serviceConfiguration"));
+      if (scf != arguments->end() && !scf->second.IsNull())
+      {
+        serviceConfigurationParameters = std::get<flutter::EncodableMap>(scf->second);
+      }
+
+      const auto ap = arguments->find(flutter::EncodableValue("additionalParameters"));
+      if (ap != arguments->end() && !ap->second.IsNull())
+      {
+        additionalParameters = std::get<flutter::EncodableMap>(ap->second);
+      }
+
+      const auto pes = arguments->find(flutter::EncodableValue("preferEphemeralSession"));
+      if (pes != arguments->end() && !pes->second.IsNull())
+      {
+        preferEphemeralSession = std::get<bool>(pes->second);
+      }
     }
   };
 
   struct AuthorizationTokenRequestParameters : public TokenRequestParameters
   {
     std::string loginHint;
-    //@property(nonatomic, strong) NSArray *promptValues;
+    flutter::EncodableList promptValues;
 
   protected:
     void processArguments(const flutter::EncodableMap *arguments) override
@@ -104,23 +122,27 @@ namespace
       const auto lh = arguments->find(flutter::EncodableValue("loginHint"));
       if (lh != arguments->end() && !lh->second.IsNull())
         loginHint = std::get<std::string>(lh->second);
-      // _promptValues = [ArgumentProcessor processArgumentValue:arguments withKey:@"promptValues"];
+
+      const auto pv = arguments->find(flutter::EncodableValue("promptValues"));
+      if (pv != arguments->end() && !pv->second.IsNull())
+        promptValues = std::get<flutter::EncodableList>(pv->second);
     };
   };
 
   class FlutterAppauthPlugin : public flutter::Plugin
   {
-  #define btnBack 1
   private:
     // The registrar for this plugin, for accessing the window.
     flutter::PluginRegistrarWindows *registrar_;
     // The ID of the WindowProc delegate registration.
     int window_proc_id_ = -1;
-    WebBrowser *webBrowser1;
 
     // Called for top-level WindowProc delegation.
-    std::optional<LRESULT> HandleWindowProc(HWND hwnd, UINT message,
-                                            WPARAM wparam, LPARAM lparam);
+    std::optional<LRESULT> HandleWindowProc(
+        HWND hwnd,
+        UINT message,
+        WPARAM wparam,
+        LPARAM lparam);
 
   public:
     const char *AUTHORIZE_METHOD = "authorize";
@@ -155,8 +177,8 @@ namespace
 
     HWND GetRootWindow(flutter::FlutterView *view)
     {
-      return view->GetNativeWindow();//
-      //return GetAncestor(view->GetNativeWindow(), GA_ROOT);
+      //return view->GetNativeWindow(); //
+      return GetAncestor(view->GetNativeWindow(), GA_ROOT);
     };
   };
 
@@ -190,7 +212,7 @@ namespace
 
   FlutterAppauthPlugin::~FlutterAppauthPlugin()
   {
-    registrar_->UnregisterTopLevelWindowProcDelegate(window_proc_id_);
+      registrar_->UnregisterTopLevelWindowProcDelegate(window_proc_id_);
   }
 
   void FlutterAppauthPlugin::HandleMethodCall(
@@ -214,21 +236,6 @@ namespace
     {
       result->NotImplemented();
     }
-
-    // if (method_call.method_name().compare("getPlatformVersion") == 0) {
-    //   std::ostringstream version_stream;
-    //   version_stream << "Windows ";
-    //   if (IsWindows10OrGreater()) {
-    //     version_stream << "10+";
-    //   } else if (IsWindows8OrGreater()) {
-    //     version_stream << "8";
-    //   } else if (IsWindows7OrGreater()) {
-    //     version_stream << "7";
-    //   }
-    //   result->Success(flutter::EncodableValue(version_stream.str()));
-    // } else {
-    //   result->NotImplemented();
-    // }
   }
 
   std::optional<LRESULT> FlutterAppauthPlugin::HandleWindowProc(
@@ -237,56 +244,7 @@ namespace
       WPARAM wparam,
       LPARAM lparam)
   {
-    std::optional<LRESULT> result;
-     switch (message)
-     {
-     case WM_CREATE:
-     break;
-		  // CreateWindowEx(0, _T("BUTTON"),
-			// 		   _T("<<< Back"),
-			// 		   WS_CHILD | WS_VISIBLE,
-			// 		   5, 5,
-			// 		   80, 30,
-			// 		   hwnd, (HMENU) btnBack, registrar_->texture_registrar->, NULL);
-    case WM_SIZE:
-      if (webBrowser1 != 0)
-      {
-        RECT rcClient;
-       // auto hWndMain = GetRootWindow(registrar_->GetView());
-        GetClientRect(hwnd, &rcClient);
-
-        RECT rc;
-        rc.left = 0;
-        rc.top = 45;
-        rc.right = rcClient.right;
-        rc.bottom = rcClient.bottom;
-        if (webBrowser1 != 0)
-        {
-          webBrowser1->SetRect(rc);
-          result = 0;
-        }
-      }
-      break;
-    // case WM_GETMINMAXINFO:
-    //   if (webBrowser1 != 0)
-    //   {
-    //     RECT rcClient;
-    //     auto hWndMain = GetRootWindow(registrar_->GetView());
-    //     GetClientRect(hWndMain, &rcClient);
-
-    //     RECT rc;
-    //     rc.left = 0;
-    //     rc.top = 45;
-    //     rc.right = rcClient.right;
-    //     rc.bottom = rcClient.bottom;
-    //     if (webBrowser1 != 0)
-    //       webBrowser1->SetRect(rc);
-    //     result = 0;
-    //   }
-    //   break;
-    }
-   // result = 0;
-    return result;
+    return DefWindowProc(hwnd, message, wparam, lparam);
   }
 
   void FlutterAppauthPlugin::HandleAuthorizeMethodCall(
@@ -295,19 +253,16 @@ namespace
   {
     AuthorizationTokenRequestParameters requestParameters;
     requestParameters.parse(args);
-    auto hWndMain = GetRootWindow(registrar_->GetView());
 
-    RECT rcClient;
-    GetClientRect(hWndMain, &rcClient);
+    // Create a 800 x 600 webview that shows Google
+    wv::WebView w{ 800, 600, true, true, Str("Hello world2!"), Str("http://google.com") };
 
-    webBrowser1 = new WebBrowser(hWndMain);
-    RECT rc;
-    rc.left = 0;
-    rc.top = 45;
-    rc.right = rcClient.right;
-    rc.bottom = rcClient.bottom;
-    webBrowser1->SetRect(rc);
-    webBrowser1->Navigate(_T("https://www.bing.com/"));
+    if (w.init() == -1) {
+        
+    }
+
+    while (w.run() == 0);
+
   };
   void FlutterAppauthPlugin::HandleTokenMethodCall(
       const flutter::EncodableValue *args)
